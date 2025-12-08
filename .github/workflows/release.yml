@@ -1,4 +1,4 @@
-name: Build, Push & Deploy
+name: Build & Publish Artifacts
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   packages: write
 
 jobs:
-  build-push-deploy:
+  build-and-publish:
     runs-on: ubuntu-latest
 
     steps:
@@ -23,8 +23,7 @@ jobs:
           go-version: "1.22"
 
       - name: Go mod tidy
-        run: |
-          go mod tidy
+        run: go mod tidy
 
       - name: Run tests
         run: go test ./...
@@ -39,34 +38,62 @@ jobs:
 
       - name: Build & push Docker image
         env:
-          IMAGE_NAME: ghcr.io/${{ github.repository }}
+          IMAGE_REPO: ghcr.io/${{ github.repository }}
           IMAGE_TAG: ${{ github.ref_name }}
         run: |
-          docker build -t $IMAGE_NAME:$IMAGE_TAG .
-          docker push $IMAGE_NAME:$IMAGE_TAG
+          echo "Building image $IMAGE_REPO:$IMAGE_TAG"
+          docker build -t $IMAGE_REPO:$IMAGE_TAG .
+          docker push $IMAGE_REPO:$IMAGE_TAG
 
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: "v1.30.0"
-
-      - name: Setup helm
+      - name: Setup Helm
         uses: azure/setup-helm@v4
         with:
           version: "v3.15.0"
 
-      - name: Configure kubeconfig
+      - name: Set chart versions from tag
         run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          # GITHUB_REF_NAME = e.g. v0.1.0
+          TAG="${GITHUB_REF_NAME}"
+          # strip leading 'v'
+          CHART_VERSION="${TAG#v}"
+          echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
+          echo "CHART_VERSION=$CHART_VERSION" >> $GITHUB_ENV
 
-      - name: Helm upgrade/install orchestrdb
-        env:
-          IMAGE_NAME: ghcr.io/${{ github.repository }}
-          IMAGE_TAG: ${{ github.ref_name }}
+      - name: Helm lint
         run: |
-          helm upgrade --install orchestrdb ./charts/orchestrdb \
-            --namespace orchestrdb-system \
-            --create-namespace \
-            --set image.repository=$IMAGE_NAME \
-            --set image.tag=$IMAGE_TAG
+          helm lint charts/orchestrdb
+
+      - name: Helm package chart
+        env:
+          CHART_VERSION: ${{ env.CHART_VERSION }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          mkdir -p .chart-packages
+          helm package charts/orchestrdb \
+            --version "$CHART_VERSION" \
+            --app-version "$IMAGE_TAG" \
+            --destination .chart-packages
+
+      - name: Login to GHCR for Helm (OCI)
+        run: |
+          echo "${{ github.token }}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Push Helm chart to GHCR (OCI)
+        env:
+          CHART_VERSION: ${{ env.CHART_VERSION }}
+        run: |
+          CHART_FILE=".chart-packages/orchestrdb-${CHART_VERSION}.tgz"
+          REGISTRY="oci://ghcr.io/${{ github.repository_owner }}/orchestrdb-charts"
+
+          echo "Pushing chart $CHART_FILE to $REGISTRY"
+          helm push "$CHART_FILE" "$REGISTRY"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            bin/orchestrdb
+            .chart-packages/orchestrdb-${{ env.CHART_VERSION }}.tgz
