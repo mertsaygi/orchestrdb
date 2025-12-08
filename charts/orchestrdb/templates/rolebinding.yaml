@@ -1,13 +1,13 @@
 {{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   name: {{ include "orchestrdb-operator.fullname" . }}-rolebinding
   labels:
     {{- include "orchestrdb-operator.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
+  kind: ClusterRole
   name: {{ include "orchestrdb-operator.fullname" . }}-role
 subjects:
   - kind: ServiceAccount
