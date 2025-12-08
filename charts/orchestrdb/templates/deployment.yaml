@@ -21,7 +21,6 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
-            - "--metrics-bind-address=:8080"
             - "--leader-elect=false"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
