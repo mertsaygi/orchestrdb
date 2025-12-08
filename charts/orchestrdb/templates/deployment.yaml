@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "orchestrdb-operator.fullname" . }}
+  labels:
+    {{- include "orchestrdb-operator.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "orchestrdb-operator.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "orchestrdb-operator.name" . }}
+        {{- include "orchestrdb-operator.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "orchestrdb-operator.serviceAccountName" . }}
+      containers:
+        - name: orchestrdb-operator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "--metrics-bind-address=:8080"
+            - "--leader-elect=false"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}

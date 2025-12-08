@@ -1,0 +1,72 @@
+name: Build, Push & Deploy
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-push-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Go mod tidy
+        run: |
+          go mod tidy
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build binary
+        run: |
+          mkdir -p bin
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/orchestrdb main.go
+
+      - name: Login to GHCR
+        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build & push Docker image
+        env:
+          IMAGE_NAME: ghcr.io/${{ github.repository }}
+          IMAGE_TAG: ${{ github.ref_name }}
+        run: |
+          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+          docker push $IMAGE_NAME:$IMAGE_TAG
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.30.0"
+
+      - name: Setup helm
+        uses: azure/setup-helm@v4
+        with:
+          version: "v3.15.0"
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Helm upgrade/install orchestrdb
+        env:
+          IMAGE_NAME: ghcr.io/${{ github.repository }}
+          IMAGE_TAG: ${{ github.ref_name }}
+        run: |
+          helm upgrade --install orchestrdb ./charts/orchestrdb \
+            --namespace orchestrdb-system \
+            --create-namespace \
+            --set image.repository=$IMAGE_NAME \
+            --set image.tag=$IMAGE_TAG
