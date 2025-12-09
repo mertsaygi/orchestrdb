@@ -9,6 +9,7 @@ import (
 	"github.com/mertsaygi/orchestrdb/src/services"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -23,12 +24,13 @@ type DatabaseReconciler struct {
 	DatabaseService *services.DatabaseService
 }
 
-// Reconcile is called when a Database resource changes or periodically requeued.
+// Reconcile is called when a Database resource changes or is periodically requeued.
 func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("database", req.NamespacedName)
 
 	var dbRes v1alpha1.Database
 	if err := r.Get(ctx, req.NamespacedName, &dbRes); err != nil {
+		// If the resource was deleted, ignore the not found error.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -40,8 +42,8 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// -------------------------------------------------------------------------
 	// Resolve admin credentials:
-	// 1. Start with inline spec fields (AdminUser/AdminPassword)
-	// 2. If adminSecretRef is set, override from Secret
+	//   1. Start from inline spec fields (AdminUser/AdminPassword)
+	//   2. If adminSecretRef is set, override from Secret
 	// -------------------------------------------------------------------------
 	adminUser := dbRes.Spec.AdminUser
 	adminPassword := dbRes.Spec.AdminPassword
@@ -54,6 +56,24 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			Name:      secRef.Name,
 			Namespace: dbRes.Namespace, // Secret is expected to live in the same namespace
 		}, &secret); err != nil {
+
+			// Secret Provider / ExternalSecrets henüz yaratmadıysa: fatal değil, bekle.
+			if apierrors.IsNotFound(err) {
+				msg := "waiting for adminSecretRef Secret to be created"
+				dbRes.Status.Created = false
+				dbRes.Status.LastError = msg
+				dbRes.Status.UpdatedAt = time.Now().Format(time.RFC3339)
+				_ = r.Status().Update(ctx, &dbRes)
+
+				log.Info(msg,
+					"secret", secRef.Name,
+					"namespace", dbRes.Namespace)
+
+				// Just requeue, do not treat this as a hard error.
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			}
+
+			// Other errors (RBAC, network, etc.) are real errors.
 			msg := "failed to get adminSecretRef Secret: " + err.Error()
 			dbRes.Status.Created = false
 			dbRes.Status.LastError = msg
@@ -64,7 +84,6 @@ func (r *DatabaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 				"secret", secRef.Name,
 				"namespace", dbRes.Namespace)
 
-			// Requeue so we can try again once the Secret exists or is fixed
 			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 		}
 
