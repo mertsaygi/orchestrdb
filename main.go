@@ -53,7 +53,12 @@ func main() {
 
 	// Wire DB adapter + service
 	postgresAdapter := db.NewPostgresAdapter()
+
+	// DatabaseService
 	dbService := services.NewDatabaseService(postgresAdapter)
+
+	// UserService
+	userService := services.NewUserService(mgr.GetClient(), postgresAdapter)
 
 	// Register controller
 	if err = (&controllers.DatabaseReconciler{
@@ -63,6 +68,15 @@ func main() {
 		DatabaseService: dbService,
 	}).SetupWithManager(mgr); err != nil {
 		ctrl.Log.Error(err, "unable to create controller", "controller", "Database")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.UserReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		UserService: userService,
+	}).SetupWithManager(mgr); err != nil {
+		ctrl.Log.Error(err, "unable to create controller", "controller", "User")
 		os.Exit(1)
 	}
 

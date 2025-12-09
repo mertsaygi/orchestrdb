@@ -131,6 +131,8 @@ func AddToScheme(scheme *runtime.Scheme) error {
 		SchemeGroupVersion,
 		&Database{},
 		&DatabaseList{},
+		&User{},
+		&UserList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
