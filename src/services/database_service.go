@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/mertsaygi/orchestrdb/src/api/v1alpha1"
+	v1alpha1 "github.com/mertsaygi/orchestrdb/src/api/v1alpha1"
 	"github.com/mertsaygi/orchestrdb/src/db"
 )
 
@@ -18,12 +18,18 @@ func NewDatabaseService(adapter db.Adapter) *DatabaseService {
 	}
 }
 
-func (s *DatabaseService) EnsureDatabase(ctx context.Context, dbRes *v1alpha1.Database) (bool, string) {
+// adminUser and adminPassword are resolved (from spec or Secret) before calling this.
+func (s *DatabaseService) EnsureDatabase(
+	ctx context.Context,
+	dbRes *v1alpha1.Database,
+	adminUser string,
+	adminPassword string,
+) (bool, string) {
 	params := db.CreateDatabaseParams{
 		Host:      dbRes.Spec.Host,
 		Port:      dbRes.Spec.Port,
-		AdminUser: dbRes.Spec.AdminUser,
-		Password:  dbRes.Spec.AdminPassword,
+		AdminUser: adminUser,
+		Password:  adminPassword,
 		Name:      dbRes.Spec.Name,
 	}
 

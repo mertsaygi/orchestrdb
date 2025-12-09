@@ -21,7 +21,7 @@ spec:
           properties:
             spec:
               type: object
-              required: ["host", "port", "adminUser", "adminPassword", "name"]
+              required: ["host", "port", "name"]
               properties:
                 host:
                   type: string
@@ -33,6 +33,15 @@ spec:
                   type: string
                 name:
                   type: string
+                adminSecretRef:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    userKey:
+                      type: string
+                    passwordKey:
+                      type: string
             status:
               type: object
               properties:

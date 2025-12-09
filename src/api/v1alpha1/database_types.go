@@ -18,6 +18,17 @@ var SchemeGroupVersion = schema.GroupVersion{
 	Version: Version,
 }
 
+type SecretRef struct {
+	// Name of the Secret in the same namespace as the Database resource
+	Name string `json:"name"`
+
+	// Key in the Secret data that contains the admin username
+	UserKey string `json:"userKey"`
+
+	// Key in the Secret data that contains the admin password
+	PasswordKey string `json:"passwordKey"`
+}
+
 // DatabaseSpec: desired state of the Database CR
 type DatabaseSpec struct {
 	// Hostname or IP address of the target database server
@@ -26,14 +37,18 @@ type DatabaseSpec struct {
 	// Port number of the target database server (e.g., 5432)
 	Port int32 `json:"port"`
 
-	// Admin user with permissions to create databases
-	AdminUser string `json:"adminUser"`
+	// Admin user with permissions to create databases (optional if adminSecretRef is used)
+	AdminUser string `json:"adminUser,omitempty"`
 
-	// Password for the admin user (stored in plaintext; production should use Secrets)
-	AdminPassword string `json:"adminPassword"`
+	// Password for the admin user (optional if adminSecretRef is used)
+	AdminPassword string `json:"adminPassword,omitempty"`
 
 	// Name of the database to create
 	Name string `json:"name"`
+
+	// Reference to a Secret that contains admin user & password
+	// If set, this takes precedence over AdminUser/AdminPassword fields.
+	AdminSecretRef *SecretRef `json:"adminSecretRef,omitempty"`
 }
 
 // DatabaseStatus: observed state updated by the operator
