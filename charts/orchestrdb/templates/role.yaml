@@ -10,6 +10,9 @@ rules:
     resources: ["databases", "databases/status"]
     verbs: ["get", "list", "watch", "update", "patch"]
   - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+  - apiGroups: [""]
     resources: ["events"]
     verbs: ["create", "patch"]
 {{- end }}

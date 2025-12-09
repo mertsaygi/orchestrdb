@@ -44,7 +44,7 @@ func main() {
 		Scheme:         scheme,
 		LeaderElection: enableLeaderElection,
 		// This ID should be unique within the cluster.
-		LeaderElectionID: "orchestrdb-operator.mertsaygi.net",
+		LeaderElectionID: "orchestrdb.mertsaygi.net",
 	})
 	if err != nil {
 		ctrl.Log.Error(err, "unable to start manager")
