@@ -1,0 +1,112 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: users.orchestrdb.mertsaygi.net
+spec:
+  group: orchestrdb.mertsaygi.net
+  scope: Namespaced
+  names:
+    plural: users
+    singular: user
+    kind: User
+    shortNames:
+      - dbu
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - host
+                - port
+                - username
+                - generatedSecret
+                - access
+              properties:
+                # Target database server hostname or IP
+                host:
+                  type: string
+                # Target database server port (e.g. 5432)
+                port:
+                  type: integer
+                # Admin user with permission to create roles and grant privileges
+                adminUser:
+                  type: string
+                # Admin password (for development only; prefer adminSecretRef)
+                adminPassword:
+                  type: string
+                # Reference to a Secret containing admin credentials.
+                # If set, this takes precedence over adminUser/adminPassword.
+                adminSecretRef:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                    userKey:
+                      type: string
+                    passwordKey:
+                      type: string
+                # SSL mode used when connecting to the server
+                sslMode:
+                  type: string
+                  default: require
+                # Database-side username to create
+                username:
+                  type: string
+                # Secret where the operator will write username/password.
+                # If the Secret already exists, the operator should fail.
+                generatedSecret:
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                # List of access rules for this user (one or more databases)
+                access:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    properties:
+                      # Database name on the target instance.
+                      # May be empty if scope=instance.
+                      dbName:
+                        type: string
+                      # Access role for this database (default: readonly)
+                      role:
+                        type: string
+                        enum:
+                          - readonly
+                          - readwrite
+                          - owner
+                        default: readonly
+                      # Scope of this access rule.
+                      # "database"  -> dbName-specific grant
+                      # "instance"  -> instance-level privileges
+                      scope:
+                        type: string
+                        enum:
+                          - database
+                          - instance
+                        default: database
+            status:
+              type: object
+              properties:
+                created:
+                  type: boolean
+                lastError:
+                  type: string
+                updatedAt:
+                  type: string
+      subresources:
+        status: {}
