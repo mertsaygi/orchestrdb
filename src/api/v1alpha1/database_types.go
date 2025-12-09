@@ -49,6 +49,11 @@ type DatabaseSpec struct {
 	// Reference to a Secret that contains admin user & password
 	// If set, this takes precedence over AdminUser/AdminPassword fields.
 	AdminSecretRef *SecretRef `json:"adminSecretRef,omitempty"`
+
+	// SSLMode controls how the operator connects to the DB server.
+	// Example values (Postgres-style): "disable", "require", "verify-ca", "verify-full".
+	// If omitted, a sensible default is used by the service layer.
+	SSLMode string `json:"sslMode,omitempty"`
 }
 
 // DatabaseStatus: observed state updated by the operator
